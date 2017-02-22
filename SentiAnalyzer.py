@@ -1,7 +1,7 @@
 import nltk
 from nltk.corpus import stopwords
 import pandas as pd
-import Features
+from Features import getVocabulary,tweet_tokenize
 import sklearn
 from sklearn import metrics
 from sklearn.naive_bayes import BernoulliNB
@@ -13,8 +13,15 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
-
 from timeit import default_timer
+
+from sklearn.ensemble import ExtraTreesClassifier
+from nltk.tokenize import TweetTokenizer
+from nltk.corpus import stopwords
+import re
+from nltk.probability import FreqDist
+from heapq import nlargest
+
 """
 #load data from CSV
 with open("DATA/training.1600000.processed.noemoticon.csv",'r') as f:
@@ -89,44 +96,40 @@ print("End of prog")
 """
 
 
-#load data from CSV
-trainDf = pd.read_csv("DATA/miniData50k.csv",quotechar="'",encoding='latin-1')
-testDf = pd.read_csv("DATA/TestData.csv",quotechar="'",encoding='latin-1')
-print("Data loaded from csv")
+
+#Gets test data from CSV
+def getLoadedTestDataFrame():
+    return pd.read_csv("DATA/TestData.csv", quotechar="'", encoding='latin-1')
 
 
-#get vocalbulary
-vocabulary = Features.getVocabulary(trainDf["Tweet"])
-print(len(vocabulary))
-dict = {'neg':0,'pos':1}
-#print(vocabulary)
-print("vocabulay formed")
+#Gets train data from CSV
+def getLoadedTrainingDataFrame():
+    return pd.read_csv("DATA/miniData50k.csv",quotechar="'",encoding='latin-1')
+
+
+#returns mapping value of neg, pos labels
+def getsClassValueFromLabel(classType):
+    dict = {'neg': 0, 'pos': 1}
+    return dict.get(classType)
 
 
 #Make trainingdata ready
 def getTrainingData():
-    trainingData = [(Features.tweet_tokenize(row[2]),dict[row[1]]) for row in trainDf.itertuples()]
+    trainingData = [(tweet_tokenize(row[2]),getsClassValueFromLabel(row[1])) for row in trainDf.itertuples()]
     return trainingData
 
-trainingData = getTrainingData()
-print("Treaining data prepared")
+
+# returns the countVectorizer funtion
+def getCountVectorizer(vocabulary):
+    return CountVectorizer(vocabulary=vocabulary)
 
 
 #Prepare feature vector
-cv = CountVectorizer(vocabulary=Features.getVocabulary(trainDf['Tweet']))
-trainDataX = cv.fit_transform([tweet for tweet in trainDf['Tweet']])
-testDataX = cv.fit_transform([tweet for tweet in testDf['Tweet']])
+def getFeatureVector(featureVectorizer,tweetDataFrame,classDataFrame):
+    xVector = featureVectorizer.fit_transform([tweet for tweet in tweetDataFrame])
+    yVector = [getsClassValueFromLabel(cls) for cls in classDataFrame]
+    return xVector,yVector
 
-"""
-transformer = TfidfVectorizer(vocabulary=Features.getVocabulary(trainDf['Tweet']))
-trainDataX = transformer.fit_transform([tweet for tweet in trainDf['Tweet']]).todense().T
-testDataX = transformer.fit_transform([tweet for tweet in testDf['Tweet']]).todense().T
-"""
-
-trainDataY = [dict[cls] for cls in trainDf['class']]
-testDataY = [dict[cls] for cls in testDf['class']]
-
-print("feature vector prepared")
 
 #prepare list of supervised machine learning classifiers
 def getClassifier(classifierCode):
@@ -142,48 +145,73 @@ def getClassifier(classifierCode):
     }
     return classifiers.get(classifierCode)
 
-#set the timer before running ML algo
-startTiming = default_timer()
 
-#Train the Data using classifier
+#get trained classifier
+def getTrainedClassifier(dataX,dataY):
+    classifier = getClassifier(1)
+    return classifier.fit(trainDataX, trainDataY)
 
-classifier = getClassifier(1)
-classifier.fit(trainDataX,trainDataY)
-print("Classifier Trained")
 
-#Get the predictive model
-trainData_predictor = classifier.predict(trainDataX)
-testData_predictor = classifier.predict(testDataX)
+#logging Evaluation metrics
+def logDiagnostics(dataY,dataPredictor,diagonisticsType):
+    if(diagonisticsType==1):
+        print("\n ------------Training data Metrics----------")
+    else:
+        print("\n------------Test data Metrics----------")
+    print("Accuracy:{0:.4f}".format(metrics.accuracy_score(dataY, dataPredictor)))
+    print("\n---Confusion Matrix---")
+    print("{0}".format(metrics.confusion_matrix(dataY, dataPredictor, labels=[1, 0])))
+    print(" ")
+    print("Classification Report")
+    print(metrics.classification_report(dataY, dataPredictor, labels=[1, 0]))
 
-print("\n Time taken by ML algo for classification is: %.2f" % (default_timer() - startTiming))
-print("\n ------------Sample tweet classification-----------------")
-sample_tweets=["@PrincessSuperC Hey Cici sweetheart! Just wanted to let u know I luv u! OH! and will the mixtape drop soon? FANTASY RIDE MAY 5TH!!!!",
+
+#test sentimental prediction for sample tweets
+def doPredictiveTestforSampleTweets(trainedClassifier,featureVectorizer):
+    print("\n ------------Sample tweet classification-----------------")
+    sample_tweets=["@PrincessSuperC Hey Cici sweetheart! Just wanted to let u know I luv u! OH! and will the mixtape drop soon? FANTASY RIDE MAY 5TH!!!!",
                "@Msdebramaye I heard about that contest! Congrats girl!!",
                "UNC!!! NCAA Champs!! Franklin St.: I WAS THERE!! WILD AND CRAZY!!!!!! Nothing like it...EVER http://tinyurl.com/49955t3",
                "Disappointing day. Attended a car boot sale to raise some funds for the sanctuary, made a total of 88p after the entry fee - sigh",
                "no more taking Irish car bombs with strange Australian women who can drink like rockstars...my head hurts.",
                "I am having terrible day!!"]
 
-for tweet in sample_tweets:
-    print(tweet+" => "+str(classifier.predict(cv.fit_transform([tweet]))).replace("[1]","Positive").replace("[0]","Negative"))
-#print(classifier.predict(cv.fit_transform(["Today I am feeling so good"])))
-#print(classifier.predict(cv.fit_transform(["This product is very bad"])))
-#Evaluation metrics
+    for tweet in sample_tweets:
+        print(tweet+" => "+str(trainedClassifier.predict(featureVectorizer.fit_transform([tweet]))).replace("[1]","Positive").replace("[0]","Negative"))
 
-"""On Training Data"""
-print("\n ------------Training data Metrics----------")
-print("Accuracy:{0:.4f}".format(metrics.accuracy_score(trainDataY,trainData_predictor)))
-print("\n---Confusion Matrix---")
-print("{0}".format(metrics.confusion_matrix(trainDataY,trainData_predictor,labels=[1,0])))
-print(" ")
-print("Classification Report")
-print(metrics.classification_report(trainDataY,trainData_predictor,labels=[1,0]))
 
-"""ON Test Data"""
-print("------------Test data Metrics----------")
-print("Accuracy:{0:.4f}".format(metrics.accuracy_score(testDataY,testData_predictor)))
-print("---Confusion Matrix---")
-print("{0}".format(metrics.confusion_matrix(testDataY,testData_predictor,labels=[1,0])))
-print(" ")
-print("Classification Report")
-print(metrics.classification_report(testDataY,testData_predictor,labels=[1,0]))
+testDf = getLoadedTestDataFrame()
+trainDf = getLoadedTrainingDataFrame()
+print("--Data loaded from csv--")
+
+
+vocabulary = getVocabulary(trainDf["Tweet"])
+#print(vocabulary)
+print("--Vocabulay formed and has %d words--" %len(vocabulary))
+
+trainingData = getTrainingData()
+print("--Training data prepared--")
+
+"""transformer = TfidfVectorizer(vocabulary=Features.getVocabulary(trainDf['Tweet']))"""
+cv = getCountVectorizer(getVocabulary(trainDf['Tweet']))
+trainDataX,trainDataY = getFeatureVector(cv,trainDf['Tweet'],trainDf['class'])
+testDataX,testDataY = getFeatureVector(cv,testDf['Tweet'],testDf['class'])
+print("feature vector prepared")
+
+#set the timer before training ML algo
+startTiming = default_timer()
+trainedClassifier = getTrainedClassifier(trainDataX,trainDataY)
+print("Classifier Trained")
+
+#Get the predictive model
+trainData_predictor = trainedClassifier.predict(trainDataX)
+testData_predictor = trainedClassifier.predict(testDataX)
+print("\n Time taken by ML algo for classification is: %.2f" % (default_timer() - startTiming))
+
+doPredictiveTestforSampleTweets(trainedClassifier,cv)
+logDiagnostics(trainDataY,trainData_predictor,1)
+logDiagnostics(testDataY,testData_predictor,0)
+
+
+
+
