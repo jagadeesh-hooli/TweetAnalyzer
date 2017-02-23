@@ -11,7 +11,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.externals import joblib
 from sklearn.feature_extraction.text import CountVectorizer
 from timeit import default_timer
 
@@ -166,18 +166,6 @@ def logDiagnostics(dataY,dataPredictor,diagonisticsType):
     print(metrics.classification_report(dataY, dataPredictor, labels=[1, 0]))
 
 
-#test sentimental prediction for sample tweets
-def doPredictiveTestforSampleTweets(trainedClassifier,featureVectorizer):
-    print("\n ------------Sample tweet classification-----------------")
-    sample_tweets=["@PrincessSuperC Hey Cici sweetheart! Just wanted to let u know I luv u! OH! and will the mixtape drop soon? FANTASY RIDE MAY 5TH!!!!",
-               "@Msdebramaye I heard about that contest! Congrats girl!!",
-               "UNC!!! NCAA Champs!! Franklin St.: I WAS THERE!! WILD AND CRAZY!!!!!! Nothing like it...EVER http://tinyurl.com/49955t3",
-               "Disappointing day. Attended a car boot sale to raise some funds for the sanctuary, made a total of 88p after the entry fee - sigh",
-               "no more taking Irish car bombs with strange Australian women who can drink like rockstars...my head hurts.",
-               "I am having terrible day!!"]
-
-    for tweet in sample_tweets:
-        print(tweet+" => "+str(trainedClassifier.predict(featureVectorizer.fit_transform([tweet]))).replace("[1]","Positive").replace("[0]","Negative"))
 
 
 testDf = getLoadedTestDataFrame()
@@ -208,9 +196,17 @@ trainData_predictor = trainedClassifier.predict(trainDataX)
 testData_predictor = trainedClassifier.predict(testDataX)
 print("\n Time taken by ML algo for classification is: %.2f" % (default_timer() - startTiming))
 
-doPredictiveTestforSampleTweets(trainedClassifier,cv)
+#doPredictiveTestforSampleTweets(trainedClassifier,cv)
 logDiagnostics(trainDataY,trainData_predictor,1)
 logDiagnostics(testDataY,testData_predictor,0)
+
+#save the trainedmodel and featurevectorizer
+classifierFileName = 'trained_model.sav'
+featureVectorizerFileName = 'featureVectorizer.sav'
+joblib.dump(trainedClassifier,classifierFileName)
+joblib.dump(cv,featureVectorizerFileName)
+
+
 
 
 
