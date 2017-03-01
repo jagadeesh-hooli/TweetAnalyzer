@@ -15,9 +15,19 @@ def doPredictiveTestforSampleTweets(trainedClassifier,featureVectorizer):
         print(tweet+" => "+str(trainedClassifier.predict(featureVectorizer.fit_transform([tweet]))).replace("[1]","Positive").replace("[0]","Negative"))
 
 
-classifierFileName = 'trained_model.sav'
-featureVectorizerFileName = 'featureVectorizer.sav'
-trained_model =joblib.load(classifierFileName)
-featureVectorizer = joblib.load(featureVectorizerFileName)
+#Read the tweets and do the prediction
+def predictSentiScoreForTweets(trainedClassifier,featureVectorizer):
+    # load raw tweets from CSV
+    with open("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/RawTweetsTemp.csv", 'r') as f:
+        file = f.readlines()
 
-doPredictiveTestforSampleTweets(trained_model,featureVectorizer)
+    with open("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/ClassifiedTweetsTemp.csv", 'w') as f1:
+        for row in file:
+            print >> f1,str(trainedClassifier.predict(featureVectorizer.fit_transform([row]))).replace("[1]","1").replace("[0]","0")+","+row ,
+
+
+trained_model =joblib.load("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/trained_model.sav")
+featureVectorizer = joblib.load("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/featureVectorizer.sav")
+
+#doPredictiveTestforSampleTweets(trained_model,featureVectorizer)
+predictSentiScoreForTweets(trained_model,featureVectorizer)
