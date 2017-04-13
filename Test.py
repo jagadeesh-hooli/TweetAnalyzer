@@ -1,4 +1,5 @@
 from sklearn.externals import joblib
+import csv
 
 
 #test sentimental prediction for sample tweets
@@ -30,4 +31,31 @@ trained_model =joblib.load("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDa
 featureVectorizer = joblib.load("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/featureVectorizer.sav")
 
 #doPredictiveTestforSampleTweets(trained_model,featureVectorizer)
-predictSentiScoreForTweets(trained_model,featureVectorizer)
+#predictSentiScoreForTweets(trained_model,featureVectorizer)
+
+def csv_dict_reader(file_obj,trainedClassifier,featureVectorizer):
+    """
+    Read a CSV file using csv.DictReader
+    """
+    reader = csv.DictReader(file_obj, delimiter=',')
+    outfilePath="/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/ClassifiedTweetsTemp.csv"
+    with open(outfilePath, "w") as csv_file:
+        csv_file.seek(0)
+        csv_file.truncate()
+        print >> csv_file ,"Id"+","+"Topic"+","+"DateOfTweet"+","+"SentiScore"+","+"Desc"
+        for line in reader:
+            print >> csv_file, line["Id"]+","+line["Topic"]+","+line["DateOfTweet"]+","+str(trainedClassifier.predict(featureVectorizer.fit_transform([line["Desc"]]))).replace("[1]","1").replace("[0]","0")+","+line["Desc"]
+
+        # print(line["Id"]),
+        # print(line["Topic"]),
+        # print(line["DateOfTweet"]),
+        # print(line["Desc"])
+
+
+
+
+if __name__ == "__main__":
+    with open("/home/jagadeesh/PycharmProjects/TweetAnalyzer/TempDatafiles/RawTweetsTemp.csv") as f_obj:
+        csv_dict_reader(f_obj,trained_model,featureVectorizer)
+
+
